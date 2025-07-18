@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Earthquake Sensor Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h2>Real-Time Earthquake Monitoring Dashboard</h2>
+<form onsubmit="submitData(); return false;">
+    <label>Nmf2:</label> <input type="number" step="0.1" id="nmf2" required><br>
+    <label>Thermal Emissivity (W/m2):</label> <input type="number" step="0.1" id="thermal" required><br>
+    <label>Magnetometer Z (nT):</label> <input type="number" id="magnet_z" required><br>
+    <label>Radon (Bq/m3):</label> <input type="number" step="0.1" id="radon" required><br>
+    <label>Username:</label> <input type="text" id="username" required><br>
+    <label>Password:</label> <input type="password" id="password" required><br>
+    <button type="submit">Submit Data</button>
+    <button onclick="downloadCSV(); return false;">Download CSV</button>
+</form>
+<hr>
+<h3>Live Alerts</h3>
+<div id="alerts"></div>
+<hr>
+<h3>Live Sensor Graphs</h3>
+<canvas id="thermalChart"></canvas>
+<canvas id="radonChart"></canvas>
+<canvas id="magnetChart"></canvas>
+<hr>
+<h3>User Session Logs</h3>
+<ul id="userLogs"></ul>
+<script>
+const sessionLogs = [];
+const collectedData = [];
+
+async function submitData() {
+    const nmf2 = document.getElementById('nmf2').value;
+    const thermal = document.getElementById('thermal').value;
+    const magnet_z = document.getElementById('magnet_z').value;
+    const radon = document.getElementById('radon').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (!validateUser(username, password)) {
+        alert("Invalid user login.");
+        return;
+    }
+
+    const timestamp = new Date().toLocaleString();
+    sessionLogs.push(`${timestamp} - ${username} submitted data`);
+    updateSessionLogs();
+
+    const payload = { nmf2, thermal, magnet_z, radon, username, timestamp };
+    collectedData.push(payload);
+
+    const res = await fetch('/submit_sensor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    document.getElementById('alerts').innerHTML = `
+        <p><b>User:</b> ${username}</p>
+        <p><b>Nmf2:</b> ${result.nmf2} — ${result.alert_nmf2}</p>
+        <p><b>Thermal:</b> ${result.thermal} — ${result.alert_thermal}</p>
+        <p><b>Magnetometer Z:</b> ${result.magnet_z} — ${result.alert_magnet}</p>
+        <p><b>Radon:</b> ${result.radon} — ${result.alert_radon}</p>
+    `;
+}
+
+function updateSessionLogs() {
+    const logContainer = document.getElementById('userLogs');
+    logContainer.innerHTML = sessionLogs.map(log => `<li>${log}</li>`).join('');
+}
+
+function validateUser(user, pass) {
+    const users = [
+        { username: "ashutosh", password: "1234" },
+        { username: "client1", password: "abcd" }
+    ];
+    return users.some(u => u.username === user && u.password === pass);
+}
+
+function downloadCSV() {
+    if (collectedData.length === 0) {
+        alert("No data to export.");
+        return;
+    }
+    const headers = Object.keys(collectedData[0]).join(",");
+    const rows = collectedData.map(obj => Object.values(obj).join(","));
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "earthquake_sensor_data.csv";
+    link.click();
+}
+
+const thermalCtx = document.getElementById('thermalChart').getContext('2d');
+const radonCtx = document.getElementById('radonChart').getContext('2d');
+const magnetCtx = document.getElementById('magnetChart').getContext('2d');
+
+const thermalChart = new Chart(thermalCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{ label: 'Thermal W/m2', data: [], borderColor: 'orange' }]
+    },
+    options: { animation: false, scales: { x: { title: { display: true, text: 'Time' } } } }
+});
+
+const radonChart = new Chart(radonCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{ label: 'Radon Bq/m3', data: [], borderColor: 'purple' }]
+    },
+    options: { animation: false, scales: { x: { title: { display: true, text: 'Time' } } } }
+});
+
+const magnetChart = new Chart(magnetCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{ label: 'Magnetometer Z', data: [], borderColor: 'blue' }]
+    },
+    options: { animation: false, scales: { x: { title: { display: true, text: 'Time' } } } }
+});
+
+async function updateCharts() {
+    const res = await fetch('/data');
+    const data = await res.json();
+
+    const labels = data.map((d, i) => i);
+    thermalChart.data.labels = labels;
+    thermalChart.data.datasets[0].data = data.map(d => d.thermal);
+    thermalChart.update();
+
+    radonChart.data.labels = labels;
+    radonChart.data.datasets[0].data = data.map(d => d.radon);
+    radonChart.update();
+
+    magnetChart.data.labels = labels;
+    magnetChart.data.datasets[0].data = data.map(d => d.magnet_z);
+    magnetChart.update();
+}
+
+setInterval(updateCharts, 2000);
+</script>
+</body>
+</html>

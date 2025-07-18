@@ -1,0 +1,9 @@
+Flask
+Flask-SQLAlchemy
+Werkzeug
+requests
+paho-mqtt
+python-dotenv
+twilio
+geocoder
+pyserial
