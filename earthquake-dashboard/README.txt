@@ -28,3 +28,7 @@ How to Run:
 5. Login (ashutosh/1234), use dashboard
 
 All alert codes and logic as per your document are implemented in server.py.
+
+
+Kindly go https://github.com/Ashugee2825/Earthquake-dashboard
+
